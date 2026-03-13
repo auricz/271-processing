@@ -21,3 +21,8 @@ export function strToDate(yyyymmdd) {
 
   return date;
 }
+
+// Takes err object and makes readable string for client
+export function formatErr(err) {
+  return `${err.name}: ${err.message}`;
+}
