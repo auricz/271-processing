@@ -3,9 +3,17 @@ let DB = [{
   password: '$2b$10$w.DyyElEBhpM.0.hYskSgOfN8FMxSMgUTLwy34q1TQzEdBlZJSA7G',
   organization: 'ORG',
   role: 'admin'
-  }];
+  },
+  {
+    username: 'user',
+    password: '$2b$10$WRthTy4g4pymQ/WlWfIEruZQjVS.yRSjkSEPTGpwXQ/q.hdNHX0cS',
+    organization: 'ORG',
+    role: 'user'
+  }
+];
 
 export function createRecord(record) {
+  console.log(record)
   return DB.push(record);
 }
 
