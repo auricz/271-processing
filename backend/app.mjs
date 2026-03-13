@@ -5,7 +5,7 @@ import { parse, serialize } from "cookie";
 import { createRecord, readRecord, updateRecord, deleteRecord } from './utils/database.mjs';
 import { body, validationResult } from "express-validator";
 import { extractCoverage, extractCopay, extractPharmacy, parse271 } from "./utils/parser.mjs";
-import { formatErr } from './utils/utils.mjs';
+import { findUser, formatErr } from './utils/utils.mjs';
 
 const APP = express();
 const PORT = 4000;
@@ -16,32 +16,38 @@ const isAuth = async (req, res, next) => {
   let organization = req.headers.organization ? validator.escape(req.headers.organization) : "";
 
   try {
-    if (validator.isEmpty(username)) throw new Error("Username is missing");
-    if (validator.isEmpty(password)) throw new Error("Password is missing");
-    if (validator.isEmpty(organization)) throw new Error("Organization is missing");
+    if (validator.isEmpty(username)) throw new Error("Login is missing username");
+    if (validator.isEmpty(password)) throw new Error("Login is missing password");
+    if (validator.isEmpty(organization)) throw new Error("Login is missing organization");
   }
   catch (msg) {
-    return res.status(400).send(msg.toString());
+    return res.status(400).end(msg.message);
   }
 
-  const record = readRecord(r => r.username === username && r.organization === organization);
+  // Check user exists
+  const record = readRecord(findUser(username, organization));
   if (record.length === 0)
-    return res.status(401).end("Access denied");
+    return res.status(401).end("Access denied no user");
 
+  // Check user's password is valid
   try {
-    const match = await bcrypt.compare(password, doc.password);
+    const match = await bcrypt.compare(password, record[0].password);
     if (!match)
-      return res.status(401).end("Access denied");
+      return res.status(401).end("Access denied passwrod");
   }
   catch (err) {
     return res.status(500).end(formatErr(err));
   }
+
+  // Check that user has been approved to the organization
+  if (record.role === 'pending')
+    return res.status(403).end("Account pending approval from admin");
+
   next();
 }
 
 const isAdmin = async (req, res, next) => {
   const { username, organization } = req.headers;
-
   const record = readRecord(r =>
     r.username === username &&
     r.organization === organization &&
@@ -67,7 +73,7 @@ APP.use((req, res, next) => {
   Allows users to create an account
 
   req: { username, password, organization }
-  res: { username (with escaped chars) }
+  res: { username (with escaped chars), role }
 */
 APP.post("/signup", async (req, res) => {
   let username = req.body.username ? validator.escape(req.body.username) : "";
@@ -80,17 +86,16 @@ APP.post("/signup", async (req, res) => {
     if (validator.isEmpty(organization)) throw new Error("Organization is missing");
   }
   catch (msg) {
-    return res.status(400).send(msg.toString());
+    return res.status(400).end(msg.message);
   }
 
   // Check if user already exists in org
-  const exists = readRecord(r => r.username === username && r.organization === organization);
-  console.log(exists);
+  const exists = readRecord(findUser(username, organization));
   if (exists.length !== 0)
     return res.status(409).end("User " + username + " already exists for this organization");
 
   // If new org, make user admin
-  let role = 'user';
+  let role = 'pending';
   const orgExists = readRecord(r => r.organization === organization);
   if (orgExists.length === 0)
     role = 'admin';
@@ -107,11 +112,10 @@ APP.post("/signup", async (req, res) => {
       createRecord({
         username,
         password: hash,
-        salt,
         organization,
         role
       });
-      return res.status(201).json(username);
+      return res.status(201).json({ username, role });
     });
   });
 });
@@ -121,7 +125,7 @@ APP.post("/signup", async (req, res) => {
 
   res: { edi }
 */
-APP.get('/eligibility', (req, res) => {
+APP.post('/eligibility', (req, res) => {
   return res.status(500).send("NOT DONE");
 });
 
@@ -140,7 +144,7 @@ APP.get('/process271', isAuth, (req, res) => {
       interchange = parse271(edi);
     }
     catch (err) {
-      return res.status(400).send(formatErr(err));
+      return res.status(400).end(formatErr(err));
     }
 
     const coverage = extractCoverage(interchange);
@@ -150,7 +154,7 @@ APP.get('/process271', isAuth, (req, res) => {
     return res.json({ coverage, copay, pharma });
   }
   catch (err) {
-    res.status(500).send(formatErr(err));
+    res.status(500).end(formatErr(err));
   }
 });
 
@@ -162,17 +166,18 @@ APP.get('/process271', isAuth, (req, res) => {
 APP.patch('/role', isAuth, isAdmin, (req, res) => {
   const { organization } = req.headers;
   const { username, newRole } = req.body;
-
-  const userRecord = readRecord(r => r.username === username && r.organization === organization);
+  
+  const userRecord = readRecord(findUser(username, organization));
   if (userRecord.length === 0)
-    return res.status(404).send(`User ${username} not found`);
+    return res.status(404).end(`User ${username} not found`);
+
+  userRecord[0].role = newRole;
 
   updateRecord(
-    {...userRecord[0], role: newRole }, 
-    r => r.username === username && r.organization === organization
+    userRecord[0], 
+    findUser(username, organization)
   );
-
-  return res.status(204);
+  return res.status(204).end();
 });
 
 /* 
@@ -184,13 +189,13 @@ APP.delete('/user', isAuth, isAdmin, (req, res) => {
   const { organization } = req.headers;
   const { username } = req.body;
 
-  const userRecord = readRecord(r => r.username === username && r.organization === organization);
+  const userRecord = readRecord(findUser(username, organization));
   if (userRecord.length === 0)
-    return res.status(404).send(`User ${username} not found`);
+    return res.status(404).end(`User ${username} not found`);
 
-  deleteRecord(r => r.username === username && r.organization === organization);
+  deleteRecord(findUser(username, organization));
 
-  return res.status(204);
+  return res.status(204).end();
 });
 
 APP.listen(PORT, () => {

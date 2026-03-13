@@ -26,3 +26,9 @@ export function strToDate(yyyymmdd) {
 export function formatErr(err) {
   return `${err.name}: ${err.message}`;
 }
+
+// Returns closure for finding user in an org
+export function findUser(username, organization) {
+  const func = (r) => r.username === username && r.organization === organization;
+  return func;
+}
