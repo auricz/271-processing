@@ -257,7 +257,7 @@ APP.get('/role', isAuth, (req, res) => {
 /* 
   Lets user subscribe and listen for published 271 responses
 */
-APP.get('/events271', (req, res) => {
+APP.get('/events271', isAuth, (req, res) => {
   res.setHeader("Content-Type", "text/event-stream")
   res.setHeader("Cache-Control", "no-cache")
   res.setHeader("Connection", "keep-alive")
