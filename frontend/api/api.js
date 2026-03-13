@@ -33,8 +33,14 @@ export async function signup(username, password, organization) {
   return await res.json();
 }
 
-export function getEligibility(data) {
-  return send("POST", "/eligibility", data);
+export async function getEligibility(data) {
+  const res = await send("POST", "/eligibility", data);
+  return await res.text();
+}
+
+export async function publish271(edi) {
+  const res = await send("POST", "/publish271", { edi });
+  return await res.json();
 }
 
 export function updateRole(username, newRole) {

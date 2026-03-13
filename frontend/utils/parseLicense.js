@@ -12,7 +12,7 @@ export function parseLicense(text) {
       : shortName ? 
       shortName[0].trim().replace('\n', ' ') 
       : null,
-    dateOfBirth: dateMatch ? dateMatch[0] : null,
+    dob: dateMatch ? dateMatch[0] : null,
     licenseNumber: licenseMatch ? licenseMatch[0].trim().replace('\n', ' ') : null,
     address: addressMatch ? addressMatch[0].trim().replace('\n', ', ') : null,
     expiryDate: dateMatch ? dateMatch[1] : null,

@@ -32,3 +32,34 @@ export function findUser(username, organization) {
   const func = (r) => r.username === username && r.organization === organization;
   return func;
 }
+
+export function randomNumberString(length) {
+  return Math.floor(Math.random() * 10 ** length)
+    .toString()
+    .padStart(length, "0");
+}
+
+export function getCurrentTime(format) {
+  const now = new Date()
+
+  const parts = {
+    yyyy: now.getFullYear().toString(),
+    yy: now.getFullYear().toString().slice(-2),
+    mm: String(now.getMonth() + 1).padStart(2, "0"),
+    dd: String(now.getDate()).padStart(2, "0"),
+    hh: String(now.getHours()).padStart(2, "0"),
+    mi: String(now.getMinutes()).padStart(2, "0"),
+    ss: String(now.getSeconds()).padStart(2, "0")
+  }
+
+  return format.replace(/yyyy|yy|mm|dd|hh|mi|ss/g, match => parts[match])
+}
+
+let counter = 1;
+export function getRequestsSentCounter(len) {
+  return counter.toString().padStart(len, '0');
+}
+
+export function incrementSentCounter() {
+  counter++;
+}

@@ -33,7 +33,7 @@ export function extractCoverage(interchange) {
   if (benefitCode.length === 0)
     return null;
   const type = BENEFIT_CODE_NAMES[benefitCode[0]];
-  const startDate = queryInterchange(interchange, 'DTP03:DTP01["291"]')[0];
+  const startDate = queryInterchange(interchange, 'DTP03:DTP01["290"]')[0];
   return { type, 'startDate': strToDate(startDate) };
 }
 

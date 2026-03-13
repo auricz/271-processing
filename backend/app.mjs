@@ -5,7 +5,7 @@ import { parse, serialize } from "cookie";
 import { createRecord, readRecord, updateRecord, deleteRecord } from './utils/database.mjs';
 import { body, validationResult } from "express-validator";
 import { extractCoverage, extractCopay, extractPharmacy, parse271 } from "./utils/parser.mjs";
-import { findUser, formatErr } from './utils/utils.mjs';
+import { findUser, formatErr, getCurrentTime, getRequestsSentCounter, incrementSentCounter, randomNumberString } from './utils/utils.mjs';
 
 const APP = express();
 const PORT = 4000;
@@ -123,10 +123,82 @@ APP.post("/signup", async (req, res) => {
 /* 
   Accepts patient data and returns a 271 response
 
-  res: { edi }
+  res: edi
+
+  I feel like this should be a GET, but GET don't have a body.
+  You could base64 encode it into the url, but it'll be LONG.
 */
 APP.post('/eligibility', (req, res) => {
-  return res.status(500).send("NOT DONE");
+  const data = req.body;
+
+  // Mockup of what would happen here:
+  // const req270 = makeRequest270(data)
+  // const res271 = await response271(payer, req270)
+
+  let firstName, lastName;
+  const nameSplit = req.body.name.split(' ');
+  if (nameSplit[0] === 'SUBSCRIBER') {
+    firstName = nameSplit[1];
+    lastName = nameSplit[2];
+  }
+  else {
+    firstName = nameSplit[0];
+    lastName = nameSplit[1];
+  }
+
+  lastName = lastName.slice(0, 6).padEnd(6, ' ');
+  const firstInital = firstName[0];
+
+  const todayYYYYMMDD = getCurrentTime('yyyymmdd');
+  const todayYYMMDD = getCurrentTime('yymmdd');
+  const todayHHMI = getCurrentTime('hhmi');
+  const interchangeContNum = getRequestsSentCounter(9);
+  const groupControlNum = getRequestsSentCounter(4);
+  
+  incrementSentCounter();
+
+  let totalSegments = 19;
+  let pharma = "";
+  if (Math.random() > 0.5) {
+    pharma = `\nEB*1*IND*88~
+REF*6P*${randomNumberString(6)}~
+REF*HJ*${randomNumberString(4)}~
+REF*CE*UHEALTH~\n`;
+    totalSegments += 4;
+  }
+
+  const res271 = `ISA*00*          *00*          *ZZ*UHC            *ZZ*ICLINIC        *${todayYYMMDD}*${todayHHMI}*^*00501*${interchangeContNum}*0*T*:~
+GS*HB*UHC*ICLINIC*${todayYYYYMMDD}*${todayHHMI}*${groupControlNum}*X*005010X279A1~
+ST*271*0001*005010X279A1~
+
+BHT*0022*11*${randomNumberString(9)}*${todayYYYYMMDD}*${todayHHMI}~
+
+HL*1**20*1~
+NM1*PR*2*UNITEDHEALTHCARE*****PI*87726~
+
+HL*2*1*21*1~
+NM1*1P*2*ICLINIC*****XX*1234567893~
+
+HL*3*2*22*0~
+TRN*2*93175-012547*9877281234~
+NM1*IL*1*${lastName}*${firstInital}****MI*123456789~
+N3*345 ANYWHERE STREET~
+N4*YOUR CITY*NY*12345~
+DMG*D8*19780308*M~
+
+DTP*290*D8*20240101~
+
+EB*1*IND*30**23~
+EB*B*IND*86**${Math.floor(Math.random() * 1000)}~
+EB*B*IND*98**${Math.floor(Math.random() * 1000)}~
+EB*B*IND*AL**${Math.floor(Math.random() * 1000)}~
+EB*B*IND*UC**${Math.floor(Math.random() * 1000)}~
+${pharma}
+SE*${totalSegments}*0001~
+GE*1*${groupControlNum}~
+IEA*1*${interchangeContNum}~`;
+
+  return res.end(res271);
 });
 
 /* 
@@ -135,7 +207,7 @@ APP.post('/eligibility', (req, res) => {
   req: { edi }
   res: { coverage, copay, pharma }
 */
-APP.get('/process271', isAuth, (req, res) => {
+APP.post('/publish271', isAuth, (req, res) => {
   const { edi } = req.body;
   let interchange;
 
