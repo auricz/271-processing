@@ -40,7 +40,7 @@ const isAuth = async (req, res, next) => {
   }
 
   // Check that user has been approved to the organization
-  if (record.role === 'pending')
+  if (!['user', 'admin'].includes(record.role))
     return res.status(403).end("Account pending approval from admin");
 
   next();

@@ -1,8 +1,9 @@
-let DB = [{
-  username: 'admin',
-  password: '$2b$10$w.DyyElEBhpM.0.hYskSgOfN8FMxSMgUTLwy34q1TQzEdBlZJSA7G',
-  organization: 'ORG',
-  role: 'admin'
+let DB = [
+  {
+    username: 'admin',
+    password: '$2b$10$w.DyyElEBhpM.0.hYskSgOfN8FMxSMgUTLwy34q1TQzEdBlZJSA7G',
+    organization: 'ORG',
+    role: 'admin'
   },
   {
     username: 'user',
@@ -13,7 +14,6 @@ let DB = [{
 ];
 
 export function createRecord(record) {
-  console.log(record)
   return DB.push(record);
 }
 
