@@ -309,7 +309,7 @@ APP.patch('/role', isAuth, isAdmin, (req, res) => {
     return res.status(404).end(`User ${username} not found`);
 
   const allOrgAdmins = readRecord(r => r.organization === organization && r.role === 'admin');
-  if (allOrgAdmins.length === 1)
+  if (allOrgAdmins.length === 1 && allOrgAdmins[0].username === username && newRole === 'user')
     return res.status(400).end("Organization must have at least 1 admin");
 
   userRecord[0].role = newRole;
