@@ -308,6 +308,10 @@ APP.patch('/role', isAuth, isAdmin, (req, res) => {
   if (userRecord.length === 0)
     return res.status(404).end(`User ${username} not found`);
 
+  const allOrgAdmins = readRecord(r => r.organization === organization && r.role === 'admin');
+  if (allOrgAdmins.length === 1)
+    return res.status(400).end("Organization must have at least 1 admin");
+
   userRecord[0].role = newRole;
 
   updateRecord(
@@ -328,6 +332,9 @@ APP.delete('/user', isAuth, isAdmin, (req, res) => {
 
   if (validator.isEmpty(username))
     return res.status(400).end("Username to delete is missing");
+
+  if (username === req.headers.username)
+    return res.status(400).end("You cannot remove yourself from the organization");
 
   const userRecord = readRecord(findUser(username, organization));
   if (userRecord.length === 0)

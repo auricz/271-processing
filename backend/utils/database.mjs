@@ -3,14 +3,7 @@ let DB = [{
   password: '$2b$10$w.DyyElEBhpM.0.hYskSgOfN8FMxSMgUTLwy34q1TQzEdBlZJSA7G',
   organization: 'ORG',
   role: 'admin'
-  },
-  {
-    username: 'a',
-    password: '$2b$10$QQf.WUbBStO76vqpTk39qOuJ6iWMgAqrtlCd39FjbnQXmDD2PBUoG',
-    organization: 'ORG',
-    role: 'user'
-  }
-];
+  }];
 
 export function createRecord(record) {
   return DB.push(record);
