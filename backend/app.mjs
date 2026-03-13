@@ -1,14 +1,14 @@
 import bcrypt from 'bcryptjs';
 import express from "express";
 import validator from "validator";
-import { parse, serialize } from "cookie";
 import { createRecord, readRecord, updateRecord, deleteRecord } from './utils/database.mjs';
-import { body, validationResult } from "express-validator";
-import { extractCoverage, extractCopay, extractPharmacy, parse271 } from "./utils/parser.mjs";
+import { extractCoverage, extractCopay, extractPharmacy, parse271, extractPatient } from "./utils/parser.mjs";
 import { findUser, formatErr, getCurrentTime, getRequestsSentCounter, incrementSentCounter, randomNumberString } from './utils/utils.mjs';
 
 const APP = express();
 const PORT = 4000;
+
+let subscribedClients = [];
 
 const isAuth = async (req, res, next) => {
   let username = req.headers.username ? validator.escape(req.headers.username) : "";
@@ -27,13 +27,13 @@ const isAuth = async (req, res, next) => {
   // Check user exists
   const record = readRecord(findUser(username, organization));
   if (record.length === 0)
-    return res.status(401).end("Access denied no user");
+    return res.status(401).end("Failed to authenticate");
 
   // Check user's password is valid
   try {
     const match = await bcrypt.compare(password, record[0].password);
     if (!match)
-      return res.status(401).end("Access denied passwrod");
+      return res.status(401).end("Failed to authenticate");
   }
   catch (err) {
     return res.status(500).end(formatErr(err));
@@ -63,8 +63,6 @@ APP.use(express.json());
 
 // For printing incoming requests
 APP.use((req, res, next) => {
-  let cookies = parse(req.headers.cookie || "");
-  req.username = cookies.username ? cookies.username : null;
   console.log("HTTP request", req.method, req.url);
   next();
 });
@@ -154,7 +152,7 @@ APP.post('/eligibility', (req, res) => {
   const todayHHMI = getCurrentTime('hhmi');
   const interchangeContNum = getRequestsSentCounter(9);
   const groupControlNum = getRequestsSentCounter(4);
-  
+
   incrementSentCounter();
 
   let totalSegments = 19;
@@ -205,9 +203,10 @@ IEA*1*${interchangeContNum}~`;
   Clients send edi as a string, returns data for front desk
 
   req: { edi }
-  res: { coverage, copay, pharma }
+  res: { patient, coverage, copay, pharma }
 */
 APP.post('/publish271', isAuth, (req, res) => {
+  const { organization } = req.headers;
   const { edi } = req.body;
   let interchange;
 
@@ -219,15 +218,75 @@ APP.post('/publish271', isAuth, (req, res) => {
       return res.status(400).end(formatErr(err));
     }
 
+    const patient = extractPatient(interchange);
     const coverage = extractCoverage(interchange);
     const copay = extractCopay(interchange);
     const pharma = extractPharmacy(interchange);
 
-    return res.json({ coverage, copay, pharma });
+    if (validator.isEmpty(patient))
+      return res.status(400).end("Patient name is missing in EDI");
+
+    const structData = { patient, coverage, copay, pharma };
+
+    // Post the data to all subscribed users within the organization
+    subscribedClients.forEach(c => {
+      if (c.organization === organization) {
+        const message = `data: ${JSON.stringify(structData)}\n\n`
+        c.res.write(message);
+      }
+    });
+
+    return res.json(structData);
   }
   catch (err) {
     res.status(500).end(formatErr(err));
   }
+});
+
+/* 
+  Lets user get their role
+*/
+APP.get('/role', isAuth, (req, res) => {
+  const { username, organization } = req.headers;
+
+  const record = readRecord(findUser(username, organization));
+
+  return res.end(record[0].role);
+});
+
+/* 
+  Lets user subscribe and listen for published 271 responses
+*/
+APP.get('/events271', (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream")
+  res.setHeader("Cache-Control", "no-cache")
+  res.setHeader("Connection", "keep-alive")
+
+  res.flushHeaders()
+
+  const { username, organization } = req.headers;
+
+  const clientExists = subscribedClients
+    .filter(c => c.username === username && c.organization === organization);
+  if (clientExists.length !== 0)
+    return res.status(400).end("You are already subscribed to this organization");
+
+  subscribedClients.push({ username, organization, res });
+
+  const heartbeatInt = setInterval(() => {
+    const data = {
+      timestamp: new Date().toISOString()
+    }
+
+    res.write(`heartbeat: ${JSON.stringify(data)}\n\n`);
+  }, 5000)
+
+  req.on("close", () => {
+    clearInterval(heartbeatInt);
+    subscribedClients = subscribedClients.filter(c => c.username !== username || c.organization !== organization);
+    res.end();
+  })
+
 });
 
 /* 
@@ -237,8 +296,14 @@ APP.post('/publish271', isAuth, (req, res) => {
 */
 APP.patch('/role', isAuth, isAdmin, (req, res) => {
   const { organization } = req.headers;
-  const { username, newRole } = req.body;
-  
+  const username = req.body.username ? validator.escape(req.body.username) : null;
+  const newRole = req.body.newRole ? validator.escape(req.body.newRole) : null;
+
+  if (validator.isEmpty(username))
+    return res.status(400).end("Username to update is missing");
+  if (validator.isEmpty(newRole))
+    return res.status(400).end("Role name to update is missing");
+
   const userRecord = readRecord(findUser(username, organization));
   if (userRecord.length === 0)
     return res.status(404).end(`User ${username} not found`);
@@ -246,7 +311,7 @@ APP.patch('/role', isAuth, isAdmin, (req, res) => {
   userRecord[0].role = newRole;
 
   updateRecord(
-    userRecord[0], 
+    userRecord[0],
     findUser(username, organization)
   );
   return res.status(204).end();
@@ -259,7 +324,10 @@ APP.patch('/role', isAuth, isAdmin, (req, res) => {
 */
 APP.delete('/user', isAuth, isAdmin, (req, res) => {
   const { organization } = req.headers;
-  const { username } = req.body;
+  const username = req.body.username ? validator.escape(req.body.username) : null;
+
+  if (validator.isEmpty(username))
+    return res.status(400).end("Username to delete is missing");
 
   const userRecord = readRecord(findUser(username, organization));
   if (userRecord.length === 0)

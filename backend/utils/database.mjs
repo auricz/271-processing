@@ -5,10 +5,10 @@ let DB = [{
   role: 'admin'
   },
   {
-    username: 'admina',
+    username: 'a',
     password: '$2b$10$QQf.WUbBStO76vqpTk39qOuJ6iWMgAqrtlCd39FjbnQXmDD2PBUoG',
     organization: 'ORG',
-    role: 'pending'
+    role: 'user'
   }
 ];
 

@@ -27,6 +27,13 @@ export function queryInterchange(interchange, search) {
   return result.map(res => res.value);
 }
 
+// Takes interchange and returns patient name
+export function extractPatient(interchange) {
+  const lastName = queryInterchange(interchange, 'NM103:NM101["IL"]');
+  const firstInit = queryInterchange(interchange, 'NM104:NM101["IL"]');
+  return `${lastName} ${firstInit}`;
+}
+
 // Takes interchange and returns coverage data
 export function extractCoverage(interchange) {
   const benefitCode = queryInterchange(interchange, 'EB01:EB03["30"]');

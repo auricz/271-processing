@@ -1,96 +1,166 @@
 "use client"
 
-import { publish271 } from "@/api/api"
-import { useState } from "react"
+import { getRole, listenFor271, publish271 } from "@/api/api"
+import { useState, useRef } from "react"
 
 export default function BigTextbox() {
 
-  const [inputText, setInputText] = useState("")
-  const [loadingPublish, setLoadingPublish] = useState(false)
-  const [result, setResult] = useState("");
+  const [text, setText] = useState("")
+  const [result, setResult] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [subscribed, setSubscribed] = useState(false)
 
-  async function onPublish() {
-    setResult("");
-    if (!inputText.trim()) {
-      alert("Textbox is empty")
-      return
-    }
+  const eventSourceRef = useRef(null)
 
-    setLoadingPublish(true)
+  async function publishData() {
+
+    if (!text.trim()) return
+
+    setLoading(true)
 
     try {
-      const jsonData = await publish271(inputText);
-      setResult(JSON.stringify(jsonData, null, 2))
+      console.log(text);
+      const data = await publish271(text);
+      console.log(data)
+      setResult(JSON.stringify(data, null, 2))
 
     } catch (err) {
-      alert(err.message)
+      alert(err)
     }
 
-    setLoadingPublish(false)
+    setLoading(false)
+  }
+
+  async function toggleSubscription() {
+    if (!subscribed) {
+
+      try {
+        const role = await getRole();
+        if (role === 'pending') {
+          alert("You are still pending approval from your organization's admin");
+          return;
+        }
+      }
+      catch (err) {
+        alert(err);
+        return;
+      }
+
+      const es = listenFor271();
+
+      es.onmessage = (event) => {
+        try {
+          const json = JSON.parse(event.data)
+          setResult(prev =>
+            JSON.stringify(json, null, 2) + "\n\n" + prev
+          )
+        } catch {
+          setResult(prev =>
+            event.data + "\n\n" + prev
+          )
+        }
+      }
+
+      es.onerror = (err) => {
+        console.error("SSE error", err)
+        es.close()
+        setSubscribed(false)
+      }
+
+      eventSourceRef.current = es
+      setSubscribed(true)
+
+    } else {
+
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+
+      eventSourceRef.current = null
+      setSubscribed(false)
+
+    }
   }
 
   return (
     <div
       style={{
-        maxWidth: 800,
-        margin: "40px auto",
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
         padding: 20,
         border: "1px solid #e5e7eb",
         borderRadius: 10,
-        background: "#ffffff",
-        flex: 1,
-        flexDirection: 'column'
+        background: "#fff",
+        minHeight: 0
       }}
     >
 
-      <button
-        onClick={onPublish}
-        disabled={loadingPublish}
-        style={{
-          padding: "10px 16px",
-          backgroundColor: "#2563eb",
-          color: "white",
-          border: "none",
-          borderRadius: 8,
-          cursor: "pointer",
-          fontWeight: "500",
-          marginBottom: 15
-        }}
-      >
-        {loadingPublish ? "Publishing..." : "Publish"}
-      </button>
+      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
 
-      {/* Main EDI textbox */}
+        <button
+          onClick={toggleSubscription}
+          style={{
+            padding: "8px 14px",
+            backgroundColor: subscribed ? "#dc2626" : "#16a34a",
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer"
+          }}
+        >
+          {subscribed ? "Cancel" : "Subscribe"}
+        </button>
+
+        <button
+          onClick={publishData}
+          disabled={loading}
+          style={{
+            padding: "8px 14px",
+            backgroundColor: "#2563eb",
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer"
+          }}
+        >
+          {loading ? "Publishing..." : "Publish"}
+        </button>
+
+      </div>
+
+      {/* Input textbox */}
       <textarea
-        value={inputText}
-        onChange={(e) => setInputText(e.target.value)}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         placeholder="Enter EDI data..."
         style={{
+          flex: 2,
           width: "100%",
-          height: 300,
           padding: 10,
           border: "1px solid #d1d5db",
-          borderRadius: 8,
-          resize: "vertical",
+          borderRadius: 6,
           fontFamily: "monospace",
-          marginBottom: 20
+          resize: "none",
+          marginBottom: 10,
         }}
       />
 
-      {/* Result textbox */}
+      {/* Output textbox */}
       <textarea
         value={result}
         readOnly
-        placeholder="Ouput will appear here..."
+        placeholder="Results and SSE messages appear here..."
         style={{
+          flex: 1,
           width: "100%",
-          height: 500,
           padding: 10,
           border: "1px solid #d1d5db",
-          borderRadius: 8,
-          resize: "vertical",
+          borderRadius: 6,
           fontFamily: "monospace",
-          backgroundColor: "#f9fafb"
+          background: "#f9fafb",
+          resize: "none",
+          overflow: "auto"
         }}
       />
 
