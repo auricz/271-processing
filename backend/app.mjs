@@ -23,7 +23,7 @@ const isAuth = async (req, res, next) => {
   catch (msg) {
     return res.status(400).end(msg.message);
   }
-
+  
   // Check user exists
   const record = readRecord(findUser(username, organization));
   if (record.length === 0)
@@ -40,7 +40,7 @@ const isAuth = async (req, res, next) => {
   }
 
   // Check that user has been approved to the organization
-  if (!['user', 'admin'].includes(record.role))
+  if (!['user', 'admin'].includes(record[0].role))
     return res.status(403).end("Account pending approval from admin");
 
   next();
