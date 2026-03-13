@@ -135,14 +135,14 @@ export default function BigTextbox() {
         onChange={(e) => setText(e.target.value)}
         placeholder="Enter EDI data..."
         style={{
-          flex: 2,
+          flex: 1,
           width: "100%",
           padding: 10,
           border: "1px solid #d1d5db",
           borderRadius: 6,
           fontFamily: "monospace",
-          resize: "none",
           marginBottom: 10,
+          resize: 'none'
         }}
       />
 
@@ -152,15 +152,15 @@ export default function BigTextbox() {
         readOnly
         placeholder="Results and SSE messages appear here..."
         style={{
-          flex: 1,
+          flex: 2,
           width: "100%",
           padding: 10,
           border: "1px solid #d1d5db",
           borderRadius: 6,
           fontFamily: "monospace",
           background: "#f9fafb",
-          resize: "none",
-          overflow: "auto"
+          overflow: "auto",
+          resize: 'none'
         }}
       />
 
